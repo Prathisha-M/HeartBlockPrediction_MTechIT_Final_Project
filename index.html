@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heart Block Image Analysis | MTech IT Project</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 20px rgba(0,0,0,0.3);
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .main-card {
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 30px;
+            padding: 50px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        .upload-section {
+            background: linear-gradient(135deg, #f6f8fb 0%, #e9ecef 100%);
+            border: 3px dashed #667eea;
+            border-radius: 25px;
+            padding: 60px 40px;
+            text-align: center;
+            margin-bottom: 50px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .upload-section:hover {
+            border-color: #764ba2;
+            transform: translateY(-5px);
+        }
+        
+        .upload-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 16px 50px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .progress-section {
+            background: linear-gradient(135deg, #f6f8fb 0%, #e9ecef 100%);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 40px;
+            display: none;
+        }
+        
+        .progress-bar-container {
+            width: 100%;
+            height: 12px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+        
+        .images-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 40px;
+            margin-bottom: 50px;
+        }
+        
+        .image-card {
+            background: #ffffff;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .image-wrapper {
+            width: 100%;
+            height: 400px;
+            background: linear-gradient(135deg, #f6f8fb 0%, #e9ecef 100%);
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        
+        .analysis-results {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-top: 30px;
+        }
+        
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .status-normal {
+            color: #4ade80;
+            font-weight: bold;
+        }
+        
+        .status-warning {
+            color: #fbbf24;
+            font-weight: bold;
+        }
+        
+        .status-critical {
+            color: #ef4444;
+            font-weight: bold;
+        }
+        
+        .error-message {
+            background: #ef4444;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Heart Block Image Analysis</h1>
+        <p>Advanced Active Contour Segmentation System</p>
+    </div>
+
+    <div class="container">
+        <div class="main-card">
+            <div class="upload-section" id="uploadArea">
+                <p class="upload-text">Upload Coronary Angiogram Image</p>
+                <p class="upload-subtext">Supported formats: JPG, PNG, DICOM</p>
+                <input type="file" id="fileInput" class="file-input" accept="image/*" style="display: none;">
+                <button class="upload-btn" id="uploadButton">
+                    Choose Image File
+                </button>
+            </div>
+            
+            <div class="progress-section" id="progressSection">
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+                <p class="progress-text" id="progressText">Processing your image...</p>
+            </div>
+            
+            <div id="errorMessage" style="display: none;" class="error-message"></div>
+            
+            <div class="images-grid">
+                <div class="image-card">
+                    <h3>Original Image</h3>
+                    <div class="image-wrapper">
+                        <div class="placeholder" id="uploadedPlaceholder">
+                            <p>No image uploaded yet</p>
+                        </div>
+                        <img id="uploadedImage" class="image-result" style="display: none; max-width: 100%; max-height: 100%;">
+                    </div>
+                </div>
+                
+                <div class="image-card">
+                    <h3>Segmentation Result</h3>
+                    <div class="image-wrapper">
+                        <div class="placeholder" id="resultPlaceholder">
+                            <p>Awaiting analysis...</p>
+                        </div>
+                        <img id="processedImage" class="image-result" style="display: none; max-width: 100%; max-height: 100%;">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="analysis-results" id="analysisResults" style="display: none;">
+                <h3>Analysis Results</h3>
+                <div class="result-item">
+                    <span>Blockage Detection:</span>
+                    <span id="blockageStatus" class="status-normal">No blockage detected</span>
+                </div>
+                <div class="result-item">
+                    <span>Constriction Severity:</span>
+                    <span id="constrictionLevel">0%</span>
+                </div>
+                <div class="result-item">
+                    <span>Contour Regularity:</span>
+                    <span id="regularityScore">0%</span>
+                </div>
+                <div class="result-item">
+                    <span>Analysis Message:</span>
+                    <span id="analysisMessage">Analysis pending</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const fileInput = document.getElementById('fileInput');
+            const uploadButton = document.getElementById('uploadButton');
+            const uploadArea = document.getElementById('uploadArea');
+            const uploadedImage = document.getElementById('uploadedImage');
+            const processedImage = document.getElementById('processedImage');
+            const progressSection = document.getElementById('progressSection');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const analysisResults = document.getElementById('analysisResults');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            // Analysis result elements
+            const blockageStatus = document.getElementById('blockageStatus');
+            const constrictionLevel = document.getElementById('constrictionLevel');
+            const regularityScore = document.getElementById('regularityScore');
+            const analysisMessage = document.getElementById('analysisMessage');
+
+            uploadButton.addEventListener('click', () => fileInput.click());
+            uploadArea.addEventListener('click', () => fileInput.click());
+
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.style.borderColor = '#764ba2';
+            });
+
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.style.borderColor = '#667eea';
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.style.borderColor = '#667eea';
+                if (e.dataTransfer.files.length) {
+                    handleFileUpload(e.dataTransfer.files[0]);
+                }
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length) {
+                    handleFileUpload(e.target.files[0]);
+                }
+            });
+
+            function showError(message) {
+                errorMessage.textContent = message;
+                errorMessage.style.display = 'block';
+                setTimeout(() => {
+                    errorMessage.style.display = 'none';
+                }, 5000);
+            }
+
+            function handleFileUpload(file) {
+                if (!file.type.match('image.*')) {
+                    showError('Please upload an image file (JPG, PNG, etc.)');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    uploadedImage.src = e.target.result;
+                    uploadedImage.style.display = 'block';
+                    document.getElementById('uploadedPlaceholder').style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+
+                processImage(file);
+            }
+
+            async function processImage(file) {
+                progressSection.style.display = 'block';
+                progressBar.style.width = '30%';
+                progressText.textContent = 'Uploading image...';
+
+                const formData = new FormData();
+                formData.append('image', file);
+
+                try {
+                    // First, get detailed analysis
+                    progressBar.style.width = '50%';
+                    progressText.textContent = 'Analyzing image...';
+                    
+                    const analysisResponse = await fetch('http://127.0.0.1:5000/analyze', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!analysisResponse.ok) {
+                        const errorData = await analysisResponse.json();
+                        throw new Error(errorData.error || 'Analysis failed');
+                    }
+
+                    const analysisData = await analysisResponse.json();
+                    
+                    // Check if analysis returned an error
+                    if (analysisData.error) {
+                        throw new Error(analysisData.error);
+                    }
+
+                    // Update analysis results
+                    updateAnalysisResults(analysisData);
+
+                    // Then get the processed image
+                    progressBar.style.width = '80%';
+                    progressText.textContent = 'Generating visualization...';
+                    
+                    // Reset form data for second request
+                    const formData2 = new FormData();
+                    formData2.append('image', file);
+                    
+                    const imageResponse = await fetch('http://127.0.0.1:5000/process', {
+                        method: 'POST',
+                        body: formData2
+                    });
+
+                    if (!imageResponse.ok) {
+                        const errorData = await imageResponse.json();
+                        throw new Error(errorData.error || 'Image processing failed');
+                    }
+
+                    const blob = await imageResponse.blob();
+                    
+                    // Check if blob is valid
+                    if (blob.size === 0) {
+                        throw new Error('Received empty image from server');
+                    }
+                    
+                    const url = URL.createObjectURL(blob);
+
+                    processedImage.onload = function() {
+                        URL.revokeObjectURL(url); // Clean up
+                    };
+                    
+                    processedImage.src = url;
+                    processedImage.style.display = 'block';
+                    document.getElementById('resultPlaceholder').style.display = 'none';
+                    
+                    progressBar.style.width = '100%';
+                    progressText.textContent = 'Analysis complete!';
+                    
+                    // Show analysis results
+                    analysisResults.style.display = 'block';
+
+                } catch (err) {
+                    console.error('Processing error:', err);
+                    showError('Error: ' + err.message + '\n\nPlease ensure the Flask backend is running on http://127.0.0.1:5000');
+                    
+                    // Reset progress
+                    progressSection.style.display = 'none';
+                    progressBar.style.width = '0%';
+                } finally {
+                    setTimeout(() => {
+                        progressSection.style.display = 'none';
+                        progressBar.style.width = '0%';
+                    }, 2000);
+                }
+            }
+
+            function updateAnalysisResults(data) {
+                if (data.error) {
+                    analysisMessage.textContent = 'Analysis error: ' + data.error;
+                    return;
+                }
+
+                // Update blockage status
+                if (data.blockage_detected) {
+                    blockageStatus.textContent = 'Blockage Detected';
+                    blockageStatus.className = data.constriction_severity > 0.3 ? 'status-critical' : 'status-warning';
+                } else {
+                    blockageStatus.textContent = 'No Blockage';
+                    blockageStatus.className = 'status-normal';
+                }
+
+                // Update other metrics
+                constrictionLevel.textContent = (data.constriction_severity * 100).toFixed(1) + '%';
+                regularityScore.textContent = (data.contour_regularity * 100).toFixed(1) + '%';
+                analysisMessage.textContent = data.message || 'Analysis completed successfully';
+            }
+        });
+    </script>
+</body>
+</html>
