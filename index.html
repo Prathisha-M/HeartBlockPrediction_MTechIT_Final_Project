@@ -165,6 +165,24 @@
             border-radius: 10px;
             margin: 10px 0;
             text-align: center;
+            white-space: pre-line;
+        }
+
+        /* New: styling for the "this isn't a heart image" gate message */
+        .gate-message {
+            background: #fef3c7;
+            color: #92400e;
+            border: 2px solid #fbbf24;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 10px 0;
+            text-align: center;
+        }
+
+        .gate-message strong {
+            display: block;
+            font-size: 1.1rem;
+            margin-bottom: 6px;
         }
     </style>
 </head>
@@ -193,6 +211,7 @@
             </div>
             
             <div id="errorMessage" style="display: none;" class="error-message"></div>
+            <div id="gateMessage" style="display: none;" class="gate-message"></div>
             
             <div class="images-grid">
                 <div class="image-card">
@@ -250,12 +269,15 @@
             const progressText = document.getElementById('progressText');
             const analysisResults = document.getElementById('analysisResults');
             const errorMessage = document.getElementById('errorMessage');
+            const gateMessage = document.getElementById('gateMessage');
             
             // Analysis result elements
             const blockageStatus = document.getElementById('blockageStatus');
             const constrictionLevel = document.getElementById('constrictionLevel');
             const regularityScore = document.getElementById('regularityScore');
             const analysisMessage = document.getElementById('analysisMessage');
+
+            const API_BASE = 'http://127.0.0.1:5000';
 
             uploadButton.addEventListener('click', () => fileInput.click());
             uploadArea.addEventListener('click', () => fileInput.click());
@@ -291,11 +313,26 @@
                 }, 5000);
             }
 
+            function showGateMessage(objectName, confidence) {
+                const pct = confidence ? ` (about ${(confidence * 100).toFixed(0)}% confident)` : '';
+                gateMessage.innerHTML = `<strong>This doesn't look like a coronary angiogram</strong>
+                    Modal identified this image as: <em>${objectName}</em>${pct}.
+                    Please upload a heart / coronary angiogram X-ray image instead.`;
+                gateMessage.style.display = 'block';
+            }
+
+            function resetMessages() {
+                errorMessage.style.display = 'none';
+                gateMessage.style.display = 'none';
+            }
+
             function handleFileUpload(file) {
                 if (!file.type.match('image.*')) {
                     showError('Please upload an image file (JPG, PNG, etc.)');
                     return;
                 }
+
+                resetMessages();
 
                 const reader = new FileReader();
                 reader.onload = function(e) {
@@ -308,85 +345,125 @@
                 processImage(file);
             }
 
-            async function processImage(file) {
-                progressSection.style.display = 'block';
-                progressBar.style.width = '30%';
-                progressText.textContent = 'Uploading image...';
-
+            // Step 1: ask Gemini if this is really a heart/angiogram image.
+            // Returns true if OK to continue, false if the pipeline should stop.
+            async function validateWithGemini(file) {
                 const formData = new FormData();
                 formData.append('image', file);
 
+                const response = await fetch(`${API_BASE}/validate-image`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Validation request failed');
+                }
+
+                const data = await response.json();
+
+                if (!data.is_heart_image) {
+                    showGateMessage(data.object_name || 'an unrecognized object', data.confidence);
+                    return false;
+                }
+
+                return true;
+            }
+
+            async function processImage(file) {
+                progressSection.style.display = 'block';
+                progressBar.style.width = '15%';
+                progressText.textContent = 'Checking image with Modal...';
+
                 try {
-                    // First, get detailed analysis
-                    progressBar.style.width = '50%';
+                    const isHeartImage = await validateWithGemini(file);
+
+                    if (!isHeartImage) {
+                        // Stop here — don't waste time running segmentation
+                        // on an image that isn't a coronary angiogram.
+                        progressSection.style.display = 'none';
+                        progressBar.style.width = '0%';
+                        return;
+                    }
+
+                    progressBar.style.width = '35%';
                     progressText.textContent = 'Analyzing image...';
-                    
-                    const analysisResponse = await fetch('http://127.0.0.1:5000/analyze', {
+
+                    const analysisFormData = new FormData();
+                    analysisFormData.append('image', file);
+
+                    const analysisResponse = await fetch(`${API_BASE}/analyze`, {
                         method: 'POST',
-                        body: formData
+                        body: analysisFormData
                     });
 
                     if (!analysisResponse.ok) {
-                        const errorData = await analysisResponse.json();
+                        const errorData = await analysisResponse.json().catch(() => ({}));
+                        if (errorData.error === 'not_heart_image') {
+                            showGateMessage(errorData.object_name, errorData.confidence);
+                            progressSection.style.display = 'none';
+                            progressBar.style.width = '0%';
+                            return;
+                        }
                         throw new Error(errorData.error || 'Analysis failed');
                     }
 
                     const analysisData = await analysisResponse.json();
-                    
-                    // Check if analysis returned an error
+
                     if (analysisData.error) {
                         throw new Error(analysisData.error);
                     }
 
-                    // Update analysis results
                     updateAnalysisResults(analysisData);
 
-                    // Then get the processed image
-                    progressBar.style.width = '80%';
+                    progressBar.style.width = '75%';
                     progressText.textContent = 'Generating visualization...';
-                    
-                    // Reset form data for second request
-                    const formData2 = new FormData();
-                    formData2.append('image', file);
-                    
-                    const imageResponse = await fetch('http://127.0.0.1:5000/process', {
+
+                    const processFormData = new FormData();
+                    processFormData.append('image', file);
+
+                    const imageResponse = await fetch(`${API_BASE}/process`, {
                         method: 'POST',
-                        body: formData2
+                        body: processFormData
                     });
 
                     if (!imageResponse.ok) {
-                        const errorData = await imageResponse.json();
+                        const errorData = await imageResponse.json().catch(() => ({}));
+                        if (errorData.error === 'not_heart_image') {
+                            showGateMessage(errorData.object_name, errorData.confidence);
+                            progressSection.style.display = 'none';
+                            progressBar.style.width = '0%';
+                            return;
+                        }
                         throw new Error(errorData.error || 'Image processing failed');
                     }
 
                     const blob = await imageResponse.blob();
-                    
-                    // Check if blob is valid
+
                     if (blob.size === 0) {
                         throw new Error('Received empty image from server');
                     }
-                    
+
                     const url = URL.createObjectURL(blob);
 
                     processedImage.onload = function() {
-                        URL.revokeObjectURL(url); // Clean up
+                        URL.revokeObjectURL(url);
                     };
-                    
+
                     processedImage.src = url;
                     processedImage.style.display = 'block';
                     document.getElementById('resultPlaceholder').style.display = 'none';
-                    
+
                     progressBar.style.width = '100%';
                     progressText.textContent = 'Analysis complete!';
-                    
-                    // Show analysis results
+
                     analysisResults.style.display = 'block';
 
                 } catch (err) {
                     console.error('Processing error:', err);
-                    showError('Error: ' + err.message + '\n\nPlease ensure the Flask backend is running on http://127.0.0.1:5000');
-                    
-                    // Reset progress
+                    showError('Error: ' + err.message + '\n\nPlease ensure the Flask backend is running on ' + API_BASE);
+
                     progressSection.style.display = 'none';
                     progressBar.style.width = '0%';
                 } finally {
@@ -403,7 +480,6 @@
                     return;
                 }
 
-                // Update blockage status
                 if (data.blockage_detected) {
                     blockageStatus.textContent = 'Blockage Detected';
                     blockageStatus.className = data.constriction_severity > 0.3 ? 'status-critical' : 'status-warning';
@@ -412,7 +488,6 @@
                     blockageStatus.className = 'status-normal';
                 }
 
-                // Update other metrics
                 constrictionLevel.textContent = (data.constriction_severity * 100).toFixed(1) + '%';
                 regularityScore.textContent = (data.contour_regularity * 100).toFixed(1) + '%';
                 analysisMessage.textContent = data.message || 'Analysis completed successfully';
